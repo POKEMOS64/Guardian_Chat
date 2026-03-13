@@ -1,11 +1,10 @@
 {
-  "name": "Guardian Web",
+  "name": "Guardian Chat",
   "short_name": "Guardian",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f0f2f5",
-  "theme_color": "#0088cc",
-  "orientation": "portrait",
+  "background_color": "#1a1a1a",
+  "theme_color": "#0d6efd",
   "icons": [
     {
       "src": "/icon.png",

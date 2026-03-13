@@ -1,3 +1,5 @@
+// Автор: Полевой Сергей
+
 const fs = require('fs');
 const path = require('path');
 

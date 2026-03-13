@@ -1,19 +1,34 @@
 {
   "name": "guardian-chat",
   "version": "1.0.0",
+  "description": "Private self-hosted web chat with PWA and file encryption",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "gen-keys": "node gen_keys.js",
+    "clear-db": "node clear_db.js"
   },
+  "keywords": [
+    "chat",
+    "pwa",
+    "encryption",
+    "socket.io",
+    "nodejs"
+  ],
+  "author": "Полевой Сергей",
+  "license": "MIT",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
-    "ejs": "^3.1.9",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
-    "nedb-promises": "^6.2.1",
     "multer": "^1.4.5-lts.1",
+    "nedb-promises": "^6.0.3",
     "session-file-store": "^1.5.0",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.2",
+    "web-push": "^3.6.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }

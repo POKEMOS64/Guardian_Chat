@@ -1,3 +1,5 @@
+// Автор: Полевой Сергей
+
 const express = require('express');
 const session = require('express-session');
 const FileStore = require('session-file-store')(session);
@@ -81,6 +83,14 @@ const upload = multer({ storage: storage });
 
 // Раздача статических файлов (картинок)
 app.use(express.static(path.join(__dirname, 'public')));
+
+// --- PWA Routes (для доступа к файлам из корня) ---
+app.get('/service-worker.js', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'service-worker.js'));
+});
+app.get('/icon.png', (req, res) => {
+    res.sendFile(path.resolve(__dirname, 'icon.png'));
+});
 
 // Настройка EJS
 app.set('view engine', 'ejs');

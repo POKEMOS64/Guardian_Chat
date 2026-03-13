@@ -1,3 +1,5 @@
+// Автор: Полевой Сергей
+
 const CACHE_NAME = 'guardian-cache-v1';
 const STATIC_ASSETS = [
     '/icon.png',
