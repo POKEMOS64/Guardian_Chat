@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="header" style="margin: -20px -20px 20px -20px;">
+    <span>Guardian Web ({{ current_user.username }})</span>
+    <a href="{{ url_for('logout') }}">Выход</a>
+</div>
+
+<!-- Блок админа для одобрения пользователей -->
+{% if current_user.is_admin and pending_users %}
+<div style="background: #fff3cd; padding: 10px; margin-bottom: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
+    <strong>⏳ Ждут доступа:</strong>
+    {% for u in pending_users %}
+        <div style="display: flex; justify-content: space-between; margin-top: 5px; border-bottom: 1px solid #eee; padding-bottom: 2px;">
+            <span>{{ u.username }}</span>
+            <a href="{{ url_for('approve_user', user_id=u.id) }}" style="color: #28a745; font-weight: bold; text-decoration: none;">[✓ Одобрить]</a>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div id="chat-box" style="flex: 1; overflow-y: auto; margin-bottom: 10px; padding-right: 5px; height: 70vh;">
+    <!-- Сообщения загружаются здесь -->
+</div>
+
+<div style="display: flex; gap: 10px;">
+    <input type="text" id="msg-input" placeholder="Написать..." style="flex: 1; padding: 10px;">
+    <button onclick="sendMessage()" style="padding: 10px 20px; background: #0088cc; color: white; border: none;">></button>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    
+    function renderMessages(messages) {
+        chatBox.innerHTML = messages.map(m => `
+            <div style="margin-bottom: 10px; text-align: ${m.is_mine ? 'right' : 'left'};">
+                <div style="display: inline-block; max-width: 80%; padding: 8px 12px; border-radius: 10px; background: ${m.is_mine ? '#e3f2fd' : '#f1f0f0'};">
+                    <div style="font-size: 0.8em; color: #888; margin-bottom: 2px;">${m.user}</div>
+                    ${m.content}
+                    <div style="font-size: 0.7em; color: #aaa; text-align: right;">${m.time}</div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function loadMessages() {
+        const response = await fetch('/get_messages');
+        const data = await response.json();
+        renderMessages(data);
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('msg-input');
+        const content = input.value;
+        if (!content) return;
+        
+        await fetch('/send_message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({content: content})
+        });
+        input.value = '';
+        loadMessages();
+    }
+
+    // Опрос сервера каждые 3 секунды
+    setInterval(loadMessages, 3000);
+    loadMessages();
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+# Настройки Passenger для Node.js
+# ВАЖНО: Убедитесь, что путь ниже верный (команда pwd в консоли сервера)
+PassengerAppRoot /home/a1145835/domains/mir-zadach.ru/public_html
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerStickySessions on
+
+# Разрешаем доступ всем (сбрасываем блокировки)
+Require all granted
+
+# Запрещаем просмотр списка файлов
+Options -Indexes
+
+# Включаем перенаправление на HTTPS
+RewriteEngine On
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Запрещаем скачивание баз данных, логов и шаблонов
+# JS не блокируем, иначе не загрузится клиентская часть
+<FilesMatch "\.(db|log|ejs)$">
+    Require all denied
+</FilesMatch>

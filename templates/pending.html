@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="text-align: center; margin-top: 50px;">
+    <h3>Аккаунт на проверке</h3>
+    <p>Администратор должен подтвердить ваш доступ.</p>
+    <a href="{{ url_for('logout') }}">Выйти</a>
+</div>
+{% endblock %}

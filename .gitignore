@@ -1,0 +1,12 @@
+node_modules/
+sessions/
+public/uploads/
+tmp/
+*.db
+*.log
+.env
+.DS_Store
+Thumbs.db
+package-lock.json
+npm-debug.log
+yarn-error.log

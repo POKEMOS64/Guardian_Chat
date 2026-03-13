@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Настройки для iPhone/iPad (PWA) -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Guardian">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="manifest" href="/manifest.json">
+    <title>Guardian Web</title>
+    <style>
+        :root {
+            --bg-body: #f0f2f5;
+            --bg-container: #ffffff;
+            --text-main: #000000;
+            --text-sec: #555555;
+            --sidebar-bg: #ffffff;
+            --chat-bg: #9ac2db; /* Цвет фона тг */
+            --header-bg: #ffffff;
+            --border-color: #dfe1e5;
+            --hover-bg: #f4f4f5;
+            --active-chat-bg: #3390ec;
+            --active-chat-text: #ffffff;
+            --msg-mine: #eeffdb;
+            --msg-other: #ffffff;
+            --input-bg: #ffffff;
+            --input-text: #000000;
+            --shadow-color: rgba(0,0,0,0.1);
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #18191a;
+            --bg-container: #1c1c1d;
+            --text-main: #e4e6eb;
+            --text-sec: #aaaaaa;
+            --sidebar-bg: #212121;
+            --chat-bg: #0f0f0f;
+            --header-bg: #212121;
+            --border-color: #2f2f2f;
+            --hover-bg: #2c2c2c;
+            --active-chat-bg: #2f2f2f; /* В темной теме активный чат просто чуть светлее */
+            --active-chat-text: #e4e6eb;
+            --msg-mine: #766ac8;
+            --msg-other: #212121;
+            --input-bg: #212121;
+            --input-text: #e4e6eb;
+            --shadow-color: rgba(0,0,0,0.5);
+        }
+        
+        /* --- Паттерны Фонов --- */
+        .bg-default { background: var(--chat-bg); }
+        .bg-gradient-1 { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); } /* Облачный */
+        .bg-gradient-2 { background: linear-gradient(to top, #a18cd1 0%, #fbc2eb 100%); } /* Закат */
+        .bg-gradient-3 { background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%); } /* Океан */
+        .bg-gradient-4 { background: linear-gradient(to right, #434343 0%, black 100%); } /* Ночь */
+        .bg-gradient-5 { background: linear-gradient(to top, #30cfd0 0%, #330867 100%); } /* Космос */
+        .bg-gradient-6 { background: linear-gradient(to right, #fa709a 0%, #fee140 100%); } /* Лето */
+        
+        /* Меню выбора фона */
+        .bg-picker-menu {
+            position: absolute; top: 60px; right: 10px; width: 220px; background: var(--bg-container);
+            border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: none; flex-wrap: wrap; padding: 10px; gap: 8px; z-index: 100;
+        }
+        .bg-option { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .bg-option:hover { transform: scale(1.1); }
+        .bg-option.active { border-color: #3390ec; }
+
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg-body); color: var(--text-main); margin: 0; height: 100%; width: 100%; position: fixed; overflow: hidden; }
+        
+        /* Основной лейаут */
+        .app-layout { display: flex; width: 100%; height: 100%; background: var(--bg-container); }
+
+        /* Сайдбар (Список чатов) */
+        .sidebar { width: 350px; background: var(--sidebar-bg); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 2; }
+        .sidebar-header { padding: 10px 15px; height: 60px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); background: var(--header-bg); }
+        .chat-list { flex: 1; overflow-y: auto; }
+
+        .chat-item { display: flex; align-items: center; padding: 10px 15px; cursor: pointer; transition: background 0.2s; border-radius: 10px; margin: 5px; }
+        .chat-item:hover { background: var(--hover-bg); }
+        .chat-item.active { background: var(--active-chat-bg); color: var(--active-chat-text); }
+        .chat-item.active .chat-last-msg { color: rgba(255,255,255,0.8); }
+        
+        .avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 1.2em; margin-right: 12px; flex-shrink: 0; position: relative; }
+        
+        /* Индикатор онлайна */
+        .status-badge {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            background-color: #4cd964; /* Зеленый цвет */
+            border: 2px solid var(--sidebar-bg); /* Обводка под цвет фона */
+            border-radius: 50%;
+            display: none; /* Скрыт по умолчанию */
+            z-index: 5;
+        }
+        .status-badge.online { display: block; }
+
+        .chat-info { flex: 1; min-width: 0; }
+        .chat-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 1rem; }
+        .chat-last-msg { font-size: 0.85em; color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+
+        /* Область чата */
+        .main-chat { flex: 1; display: flex; flex-direction: column; background: var(--chat-bg); position: relative; min-width: 0; }
+        .chat-header { height: 60px; flex-shrink: 0; padding: 0 15px; background: var(--header-bg); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; z-index: 2; box-shadow: 0 1px 2px var(--shadow-color); }
+        .chat-header-info { display: flex; align-items: center; }
+        /* Стили для статуса "печатает" */
+        .typing-indicator { font-size: 0.8em; color: #3390ec; height: 1.2em; overflow: hidden; font-weight: normal; margin-top: 2px; opacity: 0; transition: opacity 0.3s; }
+        .typing-indicator.active { opacity: 1; }
+        
+        .back-btn { display: none; margin-right: 15px; background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-main); }
+
+        #chat-box { flex: 1; overflow-y: auto; padding: 10px 20px; display: flex; flex-direction: column; gap: 5px; }
+        
+        .input-area { padding: 10px 20px; background: var(--header-bg); display: flex; gap: 10px; align-items: flex-end; min-height: 104px; box-sizing: border-box; }
+
+        /* Спиннер загрузки */
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #0088cc; border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .delete-msg-btn { color: #dc3545; cursor: pointer; margin-left: 8px; font-weight: bold; text-decoration: none; border: none; background: none; font-size: 1.1em; padding: 0; }
+        .delete-msg-btn:hover { color: #a71d2a; }
+        /* Чтобы кнопка удаления не ломала верстку */
+        .msg-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
+        .msg-footer div { font-size: 0.7em; opacity: 0.7; }
+        
+        /* Индикатор загрузки над полем ввода */
+        .upload-status {
+            display: none; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 5px 10px; 
+            color: var(--text-sec); 
+            font-size: 0.9em;
+            flex-direction: column; /* Чтобы прогресс-бар был под текстом */
+        }
+        .img-container {
+            position: relative;
+        }
+        .download-btn {
+            position: absolute; 
+            bottom: 15px; /* отступ от нижнего края картинки */
+            right: 10px; /* отступ от правого края картинки */
+            background: rgba(0,0,0,0.6); 
+            color: white; 
+            padding: 4px 8px; 
+            border-radius: 5px; 
+            text-decoration: none; 
+            font-size: 1.2em;
+            line-height: 1;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .img-container:hover .download-btn {
+            opacity: 1;
+        }
+        
+        /* GIF Picker */
+        .gif-picker { position: absolute; bottom: 70px; left: 10px; width: 300px; height: 350px; background: var(--bg-container); border: 1px solid var(--user-list-border); border-radius: 10px; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); display: none; flex-direction: column; z-index: 1000; }
+        .gif-search { padding: 10px; border-bottom: 1px solid var(--user-list-border); display: flex; gap: 5px; }
+        .gif-grid { flex: 1; overflow-y: auto; padding: 5px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+        .gif-item { width: 100%; cursor: pointer; border-radius: 5px; object-fit: cover; height: 100px; }
+
+        /* Стили сообщений */
+        .message-row { display: flex; margin-bottom: 5px; }
+        .message-row.mine { justify-content: flex-end; }
+        .message-bubble { 
+            max-width: 75%; 
+            padding: 8px 12px; 
+            border-radius: 12px; 
+            position: relative; 
+            box-shadow: 0 1px 1px var(--shadow-color);
+            background: var(--msg-other);
+            color: var(--text-main);
+            border-bottom-left-radius: 0;
+        }
+        .message-row.mine .message-bubble {
+            background: var(--msg-mine);
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 0;
+        }
+        .sender-name { font-size: 0.8em; color: #3390ec; font-weight: bold; margin-bottom: 3px; cursor: pointer; }
+
+        /* Новые стили для панели ввода */
+        .input-actions { display: flex; flex-direction: column; gap: 5px; margin-right: 5px; }
+        .action-btn { background: none; border: none; cursor: pointer; color: var(--text-sec); padding: 5px; font-size: 1.2em; transition: color 0.2s; }
+        .action-btn:hover { color: #3390ec; }
+        #msg-input { resize: none; border-radius: 20px; border: 2px solid var(--border-color); font-family: inherit; line-height: 1.4; min-height: 80px; }
+        #msg-input { resize: none; border-radius: 20px; border: 2px solid var(--border-color); font-family: inherit; line-height: 1.4; min-height: 80px; max-height: 300px; overflow-y: auto; }
+        #msg-input:focus { border-color: #3390ec; }
+
+        /* Стили для ответов */
+        .reply-bar { display: none; align-items: center; justify-content: space-between; padding: 8px 15px; background: var(--header-bg); border-top: 1px solid var(--border-color); border-left: 4px solid #3390ec; }
+        .reply-content { flex: 1; font-size: 0.9em; overflow: hidden; display: flex; flex-direction: column; }
+        .reply-name { color: #3390ec; font-weight: bold; font-size: 0.8em; margin-bottom: 2px; }
+        .reply-text { color: var(--text-sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .reply-close { background: none; border: none; font-size: 1.2em; cursor: pointer; color: var(--text-sec); padding: 0 10px; }
+        
+        .msg-quote { border-left: 2px solid #3390ec; background: rgba(51, 144, 236, 0.1); border-radius: 4px; padding: 4px 8px; margin-bottom: 6px; font-size: 0.85em; cursor: pointer; display: block; text-decoration: none; }
+        .msg-quote-user { color: #3390ec; font-weight: bold; }
+        .msg-quote-text { color: var(--text-main); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .reply-btn-icon { cursor: pointer; font-size: 1.2em; color: var(--text-sec); margin-right: 8px; opacity: 0.6; line-height: 1; }
+        .reply-btn-icon:hover { opacity: 1; color: #3390ec; }
+
+        /* Анимация записи */
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Адаптивность (Mobile) */
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; position: absolute; height: 100%; transition: transform 0.3s ease; }
+            .main-chat { width: 100%; position: absolute; height: 100%; transform: translateX(100%); transition: transform 0.3s ease; }
+            
+            /* Когда чат открыт */
+            body.chat-open .sidebar { transform: translateX(-20%); opacity: 0; pointer-events: none; }
+            body.chat-open .main-chat { transform: translateX(0); }
+            
+            .back-btn { display: block; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Звуковой элемент (скрытый) -->
+    <audio id="notify-sound" src="/notification.mp3" preload="auto"></audio>
+
+    <div class="app-layout">
+        <!-- Левая колонка: Список чатов -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <button id="push-btn" onclick="enablePush()" style="background:none; border:none; cursor:pointer; font-size:1.2em; filter: grayscale(100%);" title="Включить уведомления">🔔</button>
+                    <button id="theme-toggle" style="background:none; border:none; cursor:pointer; font-size:1.4em;" title="Сменить тему">🌓</button>
+                    <div style="font-weight:bold;"><%= user.username %></div>
+                </div>
+                <div style="display:flex; gap:15px;">
+                    <% if (user.is_admin) { %>
+                        <a href="/admin" style="text-decoration:none; color: var(--text-sec); font-size: 1.2em;" title="Админка">⚙️</a>
+                    <% } %>
+                    <a href="/logout" style="text-decoration:none; color: var(--text-sec); font-size: 1.2em;" title="Выход">🚪</a>
+                </div>
+            </div>
+
+            <!-- Уведомление о регистрации (для админа) -->
+            <% if (user.is_admin && pendingUsers.length > 0) { %>
+            <div style="background: #fff3cd; color: #856404; padding: 10px; font-size:0.9em; border-bottom: 1px solid #ffeeba;">
+                <strong>⏳ Ждут доступа:</strong>
+                <% pendingUsers.forEach(function(u) { %>
+                    <div style="display: flex; justify-content: space-between; margin-top: 5px; padding-bottom: 2px;">
+                        <span><%= u.username %></span>
+                        <% 
+                            // Хелпер для проверки групп прямо в шаблоне
+                            const uGroups = u.group_ids || (u.group_id ? [u.group_id] : []);
+                            // Цвета для кнопок
+                            const colors = ['#28a745', '#17a2b8', '#fd7e14', '#6f42c1', '#e83e8c', '#20c997'];
+                            const btnStyle = (gid, color) => uGroups.includes(gid) 
+                                ? `color: white; background: ${color}; padding: 2px 5px; border-radius: 4px;` 
+                                : `color: ${color};`;
+                            const btnText = (gid) => uGroups.includes(gid) ? `[v Гр.${gid}]` : `[+ Гр.${gid}]`;
+                        %>
+                        <div style="display: flex; gap: 5px; align-items: center; flex-wrap: wrap;">
+                            <% Object.keys(groupNames).map(Number).sort((a,b)=>a-b).forEach(function(gid) { 
+                                const color = colors[(gid - 1) % colors.length];
+                            %>
+                                <a href="/admin/approve/<%= u._id %>/<%= gid %>" style="<%= btnStyle(gid, color) %> font-weight: bold; text-decoration: none; font-size: 0.8em;" title="<%= groupNames[gid] %>"><%= btnText(gid) %></a>
+                            <% }); %>
+                            <a href="/admin/reject/<%= u._id %>" style="color: #dc3545; font-weight: bold; text-decoration: none; margin-left: 5px;">[X]</a>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+            <% } %>
+
+            <div class="chat-list">
+                <!-- Кнопки групп -->
+                <% availableGroups.forEach(function(gid) { %>
+                    <% const gName = groupNames[gid] || `Группа ${gid}`; %>
+                    <div class="chat-item" onclick="switchChat(null, <%= gid %>, '<%= gName %>')" id="btn-group-<%= gid %>">
+                        <div class="avatar" style="background: linear-gradient(135deg, #FF9966, #FF5E62);">G<%= gid %></div>
+                        <div class="chat-info">
+                            <div class="chat-name"><%= gName %></div>
+                            <div class="chat-last-msg">Групповой чат</div>
+                        </div>
+                    </div>
+                <% }); %>
+                
+                <!-- Кнопки пользователей (ЛС) -->
+                <% comrades.forEach(function(c) { %>
+                    <div class="chat-item" onclick="switchChat('<%= c._id %>', null, '<%= c.username %>')" id="btn-user-<%= c._id %>">
+                        <div class="avatar">
+                            <%= c.username.charAt(0).toUpperCase() %>
+                            <div class="status-badge" id="status-<%= c._id %>"></div>
+                        </div>
+                        <div class="chat-info">
+                            <div class="chat-name"><%= c.username %></div>
+                            <div class="chat-last-msg">Личное сообщение</div>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+
+        <!-- Правая колонка: Чат -->
+        <div class="main-chat">
+            <div class="chat-header">
+                <div class="chat-header-info">
+                    <button class="back-btn" onclick="backToMenu()">←</button>
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="font-weight:bold; font-size:1.1em;" id="chat-title">Выберите чат</div>
+                        <div id="typing-indicator" class="typing-indicator">печатает...</div>
+                    </div>
+                </div>
+                
+                <!-- Кнопка смены фона -->
+                <div style="position: relative;">
+                    <button onclick="toggleBgPicker()" style="background: none; border: none; font-size: 1.5em; cursor: pointer; color: var(--text-sec);" title="Сменить фон">🎨</button>
+                    <div id="bg-picker-menu" class="bg-picker-menu">
+                        <div class="bg-option bg-default" onclick="changeBackground('bg-default')" title="По умолчанию"></div>
+                        <div class="bg-option bg-gradient-1" onclick="changeBackground('bg-gradient-1')"></div>
+                        <div class="bg-option bg-gradient-2" onclick="changeBackground('bg-gradient-2')"></div>
+                        <div class="bg-option bg-gradient-3" onclick="changeBackground('bg-gradient-3')"></div>
+                        <div class="bg-option bg-gradient-5" onclick="changeBackground('bg-gradient-5')"></div>
+                        <div class="bg-option bg-gradient-6" onclick="changeBackground('bg-gradient-6')"></div>
+                        <div class="bg-option bg-gradient-4" onclick="changeBackground('bg-gradient-4')"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chat-box">
+                <div style="text-align: center; margin-top: 40%; color: var(--text-sec); opacity: 0.5;">
+                    Выберите чат из списка слева, чтобы начать общение
+                </div>
+                <!-- Сообщения через JS -->
+            </div>
+            
+            <!-- Окно выбора GIF -->
+            <div class="gif-picker" id="gif-picker">
+                <div class="gif-search">
+                     <input type="text" id="gif-search-input" placeholder="Поиск GIF..." style="flex:1; padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                     <button onclick="searchGifs()" style="padding: 5px 10px; cursor: pointer;">🔍</button>
+                </div>
+                <div class="gif-grid" id="gif-grid"></div>
+            </div>
+
+            <!-- Индикатор загрузки над вводом -->
+            <div id="upload-status" class="upload-status">
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <div class="loader" style="display: block; border-top-color: var(--text-sec);"></div> 
+                    <span id="upload-text">Отправка файла...</span>
+                </div>
+                <div id="progress-container" style="width: 100%; height: 4px; background: #ddd; border-radius: 2px; overflow: hidden; display: none; margin-top: 5px;">
+                    <div id="upload-progress" style="height: 100%; width: 0%; background: #28a745; transition: width 0.1s;"></div>
+                </div>
+            </div>
+            
+            <!-- Панель ответа (скрыта по умолчанию) -->
+            <div id="reply-bar" class="reply-bar">
+                <div class="reply-content">
+                    <span class="reply-name" id="reply-target-user">User</span>
+                    <span class="reply-text" id="reply-target-text">Message</span>
+                </div>
+                <button class="reply-close" onclick="cancelReply()">×</button>
+            </div>
+
+            <div class="input-area">
+                <!-- Панель записи (скрыта по умолчанию) -->
+                <div id="recording-ui" style="display:none; flex: 1; align-items: center; gap: 15px; padding: 0 10px; height: 80px; box-sizing: border-box;">
+                    <div style="color: #dc3545; font-weight: bold; display: flex; align-items: center; gap: 5px;">
+                        <span style="animation: pulse 1s infinite;">🔴</span> 
+                        <span id="rec-timer">00:00</span>
+                    </div>
+                    <div style="flex: 1;"></div>
+                    <button onclick="cancelRecording()" style="background: none; border: none; cursor: pointer; color: var(--text-sec); font-size: 1.2em;">❌</button>
+                    <button onclick="stopAndSendRecording()" style="background: none; border: none; cursor: pointer; color: #28a745; font-size: 1.5em;">✅</button>
+                </div>
+
+                <!-- Обычные контролы (скрываются при записи) -->
+                <div id="text-input-ui" style="display: flex; flex: 1; align-items: flex-end; gap: 10px;">
+                <!-- Кнопка микрофона -->
+                <div class="input-actions">
+                    <button onclick="startRecording()" id="mic-btn" class="action-btn" title="Голосовое">🎤</button>
+                    <button onclick="document.getElementById('file-input').click()" id="attach-btn" class="action-btn" title="Прикрепить">📎</button>
+                    <button onclick="toggleGifPicker()" id="gif-btn" class="action-btn" style="font-size: 0.8em; font-weight: bold; border: 1px solid currentColor; border-radius: 4px;">GIF</button>
+                </div>
+                
+                <textarea id="msg-input" placeholder="Написать сообщение..." style="flex: 1; padding: 12px; background: var(--input-bg); color: var(--input-text); outline: none; font-size: 1rem;"></textarea>
+                <input type="file" id="file-input" style="display: none;" onchange="updateFileButton()">
+                
+                <button onclick="sendMessage()" id="send-btn" style="padding: 10px; background: #3390ec; color: white; border: none; border-radius: 50%; width: 45px; height: 45px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); margin-bottom: 15px;">
+                    <span style="font-size:1.2em; margin-left: 2px;">➤</span>
+                    <div class="loader" id="send-loader"></div>
+                </button>
+                </div>
+            </div>
+            
+            <!-- Панель шифрования -->
+            <div id="encrypt-panel" style="display:none; flex-direction: column; padding: 10px 20px; background: var(--header-bg); border-top: 1px solid var(--border-color); gap: 10px; font-size: 0.9em;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="encrypt-checkbox" onchange="toggleEncryptInput()">
+                    <label for="encrypt-checkbox" style="color: var(--text-main); font-weight: bold; cursor: pointer;">Зашифровать файл 🔒</label>
+                </div>
+                <div id="encrypt-input-container" style="display:none; align-items: center; gap: 10px;">
+                    <input type="text" id="file-password" placeholder="Придумайте пароль..." style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; width: 150px;">
+                    <span style="color: #dc3545; font-size: 0.8em;">(Запомните его!)</span>
+                </div>
+        </div>
+    </div>
+
+    <script>
+        // Подключаем клиент Socket.IO
+        // Он будет доступен по адресу /socket.io/socket.io.js
+    </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // Инициализация Socket.IO
+        // VAPID ключ с сервера
+        const publicVapidKey = '<%= vapidPublicKey %>';
+
+        // --- Логика Тем ---
+        const toggleBtn = document.getElementById('theme-toggle');
+        const root = document.documentElement;
+        
+        // Проверка сохраненной темы
+        if (localStorage.getItem('theme') === 'dark') root.setAttribute('data-theme', 'dark');
+
+        toggleBtn.addEventListener('click', () => {
+            const currentTheme = root.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            if (newTheme === 'dark') root.setAttribute('data-theme', 'dark');
+            else root.removeAttribute('data-theme');
+            localStorage.setItem('theme', newTheme);
+        });
+
+        function toggleEncryptInput() {
+            const checkbox = document.getElementById('encrypt-checkbox');
+            const container = document.getElementById('encrypt-input-container');
+            container.style.display = checkbox.checked ? 'flex' : 'none';
+        }
+
+        const chatBox = document.getElementById('chat-box');
+        let isFirstLoad = true;
+        // Передаем статус админа из EJS в JS
+        const isAdmin = <%= user.is_admin ? 'true' : 'false' %>;
+        const myUserId = '<%= user._id %>';
+        // Доступные группы для выбора по умолчанию
+        const myGroups = [<%= availableGroups.join(',') %>];
+        const groupNames = <%- JSON.stringify(groupNames) %>;
+        
+        let currentChatId = null; // null = общий чат
+        let currentGroupId = myGroups.length > 0 ? myGroups[0] : null; // По умолчанию первая доступная группа
+        let lastMessageId = null; // Запоминаем ID последнего сообщения
+        let currentMessages = []; // Храним загруженные сообщения локально
+        let replyToId = null; // ID сообщения, на которое отвечаем
+        let typingTimeout = null; // Таймер остановки набора
+        let typingUsers = new Set(); // Список тех, кто сейчас печатает (для групп)
+
+        // --- Звуковые уведомления ---
+        // Браузеры запрещают авто-звук. Разрешаем его при первом клике в любом месте.
+        document.body.addEventListener('click', () => {
+            const audio = document.getElementById('notify-sound');
+            // Пытаемся проиграть тишину, чтобы "разбудить" аудио-движок
+            audio.play().then(() => audio.pause()).catch(() => {});
+        }, { once: true });
+
+        function playNotification() {
+            const audio = document.getElementById('notify-sound');
+            audio.currentTime = 0; // Перемотка в начало
+            audio.play().catch(e => console.log('Звук заблокирован (нужен клик):', e));
+        }
+
+        // --- Функция безопасного скачивания ---
+        function downloadSecure(filename) {
+            const password = prompt("Введите пароль для расшифровки файла:");
+            if (!password) return;
+            
+            // Открываем в новом окне ссылку на скачивание с паролем
+            // Сервер расшифрует поток на лету
+            window.location.href = `/download_secure?file=${filename}&password=${encodeURIComponent(password)}`;
+        }
+        
+        // --- Логика GIF ---
+        // Вставьте сюда ВАШ ключ, полученный на developers.giphy.com
+        // Старый ключ 'GlVGYHwiHdkZlBcFLcwHzKBgSk8Gw487' перестал работать (Error 401)
+        const GIPHY_API_KEY = 'qMjwpOCxAQAm1eO4e6ijva2lwF8R1q7e'; 
+        
+        function toggleGifPicker() {
+            const picker = document.getElementById('gif-picker');
+            if (picker.style.display === 'flex') {
+                picker.style.display = 'none';
+            } else {
+                picker.style.display = 'flex';
+                searchGifs(); // Загрузить тренды при открытии
+            }
+        }
+
+        async function searchGifs() {
+            const q = document.getElementById('gif-search-input').value;
+            const url = q 
+                ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_API_KEY}&q=${q}&limit=20&rating=g`
+                : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_API_KEY}&limit=20&rating=g`;
+            
+            try {
+                const res = await fetch(url);
+                
+                if (!res.ok) {
+                    throw new Error(`Ошибка API: ${res.status}`);
+                }
+
+                const data = await res.json();
+                const grid = document.getElementById('gif-grid');
+                grid.innerHTML = data.data.map(gif => 
+                    `<img src="${gif.images.fixed_height.url}" class="gif-item" onclick="sendGif('${gif.images.original.url}')">`
+                ).join('');
+            } catch (e) {
+                console.error("Ошибка Giphy:", e);
+                const grid = document.getElementById('gif-grid');
+                grid.innerHTML = `<div style="padding: 10px; color: #dc3545; text-align: center;">Не удалось загрузить GIF.<br><small>Проверьте API Key (Error 401)</small></div>`;
+            }
+        }
+
+        function sendGif(url) {
+            // Отправляем GIF просто как ссылку
+            document.getElementById('msg-input').value = url;
+            toggleGifPicker();
+            sendMessage();
+        }
+
+        function backToMenu() {
+            document.body.classList.remove('chat-open');
+        }
+
+        function switchChat(userId, groupId, name) {
+            // userId передается для ЛС, groupId для групп
+            if (currentChatId === userId && currentGroupId === groupId) return;
+            
+            currentChatId = userId;
+            currentGroupId = groupId;
+            
+            // Сброс индикатора при смене чата
+            typingUsers.clear();
+            updateTypingUI();
+            
+            document.getElementById('chat-title').innerText = userId ? name : name;
+            
+            // Обновляем подсветку кнопок
+            document.querySelectorAll('.chat-item').forEach(b => b.classList.remove('active'));
+            
+            if (userId) {
+                const btn = document.getElementById('btn-user-' + userId); // Исправлен ID
+                if (btn) btn.classList.add('active');
+            } else if (groupId) {
+                const btn = document.getElementById('btn-group-' + groupId); // Исправлен ID
+                if (btn) btn.classList.add('active');
+            }
+
+            // На мобильном - открываем окно чата
+            document.body.classList.add('chat-open');
+
+            // Очищаем чат и форсируем загрузку
+            chatBox.innerHTML = '<div style="text-align:center; color:#888;">Загрузка...</div>';
+            isFirstLoad = true;
+            loadMessages();
+        }
+        
+        function applyBackgroundClass(bgClass) {
+            const chatEl = document.querySelector('.main-chat');
+            if (!chatEl) return;
+            // Удаляем все классы bg-*
+            Array.from(chatEl.classList).forEach(cls => {
+                if (cls.startsWith('bg-')) chatEl.classList.remove(cls);
+            });
+            // Добавляем новый
+            if (bgClass) chatEl.classList.add(bgClass);
+        }
+
+        function renderMessages(messages) {
+            // Используем единую функцию генерации HTML (createMessageHtml), которая описана ниже
+            chatBox.innerHTML = messages.map(m => createMessageHtml(m)).join('');
+        }
+    
+        async function loadMessages(isInitial = false) {
+            try {
+                // Формируем URL в зависимости от типа чата
+                let url = '/get_messages';
+                if (currentChatId) {
+                    url += '?target_id=' + currentChatId;
+                } else if (currentGroupId) {
+                    url += '?group_id=' + currentGroupId;
+                } else {
+                    return; // Если нет ни группы, ни юзера - не грузим
+                }
+                
+                const response = await fetch(url);
+
+                // Если сервер перенаправил нас на логин (сессия истекла) - перезагружаем страницу
+                if (response.redirected || response.url.includes('/login')) {
+                    window.location.reload();
+                    return;
+                }
+
+                // Если пришла ошибка сервера, просто выходим
+                if (!response.ok) {
+                    console.error("Ошибка сервера:", response.status);
+                    // Если висит загрузка, показываем ошибку
+                    if (chatBox.innerHTML.includes('Загрузка')) {
+                        chatBox.innerHTML = `<div style="text-align:center; color:#dc3545; margin-top: 20px;">
+                            ⚠️ Ошибка сервера (${response.status})<br>Попробуйте перезагрузить страницу
+                        </div>`;
+                    }
+                    return;
+                }
+
+                // Теперь сервер возвращает объект {messages: [], background: ''}
+                const result = await response.json();
+                
+                let messages = [];
+                let bg = 'bg-default';
+
+                if (Array.isArray(result)) {
+                    messages = result; // Если сервер вернул массив (старая версия или кэш)
+                } else {
+                    messages = result.messages || [];
+                    bg = result.background || 'bg-default';
+                }
+                
+                applyBackgroundClass(bg);
+                
+                // Проверяем, находится ли пользователь внизу чата (до обновления)
+                const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
+
+                // --- Проверка новых сообщений для звука ---
+                if (messages.length > 0) {
+                    const newestMsg = messages[messages.length - 1];
+                    if (!isInitial) { // Пиликаем только при обновлении, а не при первой загрузке
+                        // Если это не первая загрузка И ID последнего сообщения изменился
+                        if (lastMessageId && newestMsg.id !== lastMessageId) {
+                            // Если сообщение НЕ мое — пиликаем
+                            if (!newestMsg.is_mine) {
+                                playNotification();
+                            }
+                        }
+                    }
+                    lastMessageId = newestMsg.id;
+                }
+                
+                currentMessages = messages; 
+                renderMessages(messages);
+                
+                // Если это первая загрузка или пользователь был внизу - крутим вниз
+                if (isFirstLoad || isAtBottom) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    isFirstLoad = false;
+                }
+            } catch (e) {
+                console.error("Ошибка связи:", e);
+                if (chatBox.innerHTML.includes('Загрузка')) {
+                    chatBox.innerHTML = `<div style="text-align:center; color:#dc3545; margin-top: 20px;">Ошибка соединения</div>`;
+                }
+            }
+        }
+    
+        // --- Логика ответов ---
+        function startReply(msgId) {
+            const msg = currentMessages.find(m => m.id === msgId);
+            if (!msg) return;
+            
+            replyToId = msgId;
+            document.getElementById('reply-bar').style.display = 'flex';
+            document.getElementById('reply-target-user').innerText = msg.user;
+            
+            let text = msg.content;
+            if (!text && msg.filename) text = "📎 Файл";
+            if (text.length > 50) text = text.substring(0, 50) + '...';
+            
+            document.getElementById('reply-target-text').innerText = text;
+            document.getElementById('msg-input').focus();
+        }
+
+        function cancelReply() {
+            replyToId = null;
+            document.getElementById('reply-bar').style.display = 'none';
+        }
+
+        function highlightMessage(id) {
+            const el = document.getElementById('msg-' + id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.querySelector('.message-bubble').style.transition = 'background 0.5s';
+                const originalBg = el.querySelector('.message-bubble').style.background;
+                el.querySelector('.message-bubble').style.background = 'var(--active-chat-bg)'; // Подсветка
+                setTimeout(() => {
+                    el.querySelector('.message-bubble').style.background = ''; // Сброс
+                }, 1000);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const fileInput = document.getElementById('file-input');
+            const passInput = document.getElementById('file-password');
+            const encryptCheckbox = document.getElementById('encrypt-checkbox');
+            const sendBtn = document.getElementById('send-btn');
+            const sendLoader = document.getElementById('send-loader');
+            const uploadStatus = document.getElementById('upload-status');
+            const content = input.value;
+            
+            if (!content && !fileInput.files.length) return;
+
+            // 1. Включаем анимацию
+            sendBtn.disabled = true;
+            sendBtn.style.opacity = '0.5';
+            sendLoader.style.display = 'block'; // Крутилка внутри кнопки
+            
+            if (fileInput.files.length > 0) {
+                uploadStatus.style.display = 'flex'; // Надпись "Отправка файла..."
+            }
+            
+            const formData = new FormData();
+            formData.append('content', content);
+            if (currentChatId) formData.append('recipient_id', currentChatId);
+            if (currentGroupId && !currentChatId) formData.append('group_id', currentGroupId);
+            if (replyToId) formData.append('reply_to_id', replyToId);
+            
+            // Сначала добавляем пароль (если есть), чтобы сервер увидел его ДО файла
+            if (fileInput.files.length > 0 && encryptCheckbox.checked && passInput.value.trim()) {
+                formData.append('file_password', passInput.value.trim());
+            }
+
+            // Файл добавляем в последнюю очередь
+            if (fileInput.files.length > 0) {
+                formData.append('file', fileInput.files[0]);
+            }
+            
+            try {
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Ошибка сервера: ${response.status}`);
+                }
+                
+                input.value = '';
+                input.style.height = 'auto'; // Сброс высоты после отправки
+                fileInput.value = ''; // Сброс файла
+                passInput.value = ''; // Сброс пароля
+                encryptCheckbox.checked = false; // Сброс галочки
+                toggleEncryptInput(); // Скрытие поля
+                document.getElementById('encrypt-panel').style.display = 'none'; // Скрываем панель
+                cancelReply(); // Сбрасываем режим ответа
+                updateFileButton();
+                loadMessages();
+            } catch (e) {
+                console.error("Ошибка отправки:", e);
+                alert("Не удалось отправить сообщение: " + e.message);
+            } finally {
+                // 2. Выключаем анимацию в любом случае (даже при ошибке)
+                sendBtn.disabled = false;
+                sendBtn.style.opacity = '1';
+                sendLoader.style.display = 'none';
+                uploadStatus.style.display = 'none';
+                input.focus();
+            }
+        }
+        
+        // Отправка по Enter
+        document.getElementById('msg-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Чтобы не переносило строку
+                sendMessage();
+            }
+        });
+        
+        // Авто-увеличение высоты поля ввода
+        const msgInput = document.getElementById('msg-input');
+        msgInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            
+            // Логика "Я печатаю"
+            if (!currentChatId && !currentGroupId) return;
+            
+            socket.emit('typing', { recipient_id: currentChatId, group_id: currentGroupId });
+            
+            if (typingTimeout) clearTimeout(typingTimeout);
+            
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing', { recipient_id: currentChatId, group_id: currentGroupId });
+            }, 2000); // Перестаем "печатать" через 2 секунды бездействия
+        });
+
+        function updateFileButton() {
+            const fileInput = document.getElementById('file-input');
+            const btn = document.getElementById('attach-btn');
+            const encPanel = document.getElementById('encrypt-panel');
+            
+            if (fileInput.files.length > 0) {
+                btn.style.color = '#28a745';
+                // Показываем поле для пароля при выборе файла
+                encPanel.style.display = 'flex';
+            } else {
+                btn.style.color = 'var(--text-sec)';
+                encPanel.style.display = 'none';
+            }
+        }
+
+        async function deleteMessage(id) {
+            if (!confirm('Удалить это сообщение?')) return;
+            
+            await fetch('/delete_message', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: id})
+            });
+            loadMessages();
+        }
+    
+    
+    // Инициализация активной кнопки при старте
+    if (!currentChatId && currentGroupId) {
+        // Не открываем чат автоматически на мобильном, чтобы видеть список
+        if (window.innerWidth > 768) {
+            switchChat(null, currentGroupId, groupNames[currentGroupId] || 'Группа ' + currentGroupId);
+        }
+    } else {
+        // Если чат не выбран, ничего не грузим пока
+    }
+
+    // --- Логика голосовых сообщений ---
+    let mediaRecorder;
+    let audioChunks = [];
+    let recInterval;
+    let recStartTime;
+
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) {
+                    audioChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.start();
+
+            // UI переключение
+            document.getElementById('text-input-ui').style.display = 'none';
+            document.getElementById('recording-ui').style.display = 'flex';
+
+            // Таймер
+            recStartTime = Date.now();
+            recInterval = setInterval(() => {
+                const diff = Math.floor((Date.now() - recStartTime) / 1000);
+                const m = Math.floor(diff / 60).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                document.getElementById('rec-timer').innerText = `${m}:${s}`;
+            }, 1000);
+
+        } catch (err) {
+            alert('Нет доступа к микрофону: ' + err.message);
+        }
+    }
+
+    function cancelRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            mediaRecorder = null;
+        }
+        resetRecUI();
+    }
+
+    function stopAndSendRecording() {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+
+        mediaRecorder.onstop = async () => {
+            try {
+                // Останавливаем все треки микрофона
+                if (mediaRecorder.stream) {
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // Создаем blob из записанных чанков
+                const mimeType = mediaRecorder.mimeType || 'audio/webm';
+                const audioBlob = new Blob(audioChunks, { type: mimeType });
+                
+                // Создаем файл для отправки
+                const audioFile = new File([audioBlob], `voice-${Date.now()}.webm`, { type: mimeType });
+                
+                // Отправляем файл
+                await sendVoiceMessage(audioFile);
+                
+            } catch (e) {
+                console.error('Ошибка при обработке голосового сообщения:', e);
+                alert('Ошибка при отправке голосового сообщения');
+            } finally {
+                resetRecUI();
+            }
+        };
+
+        mediaRecorder.stop();
+    }
+
+    async function sendVoiceMessage(audioFile) {
+        const formData = new FormData();
+        
+        if (currentChatId) {
+            formData.append('recipient_id', currentChatId);
+        } else if (currentGroupId) {
+            formData.append('group_id', currentGroupId);
+        }
+        
+        if (replyToId) {
+            formData.append('reply_to_id', replyToId);
+        }
+
+        // Если включено шифрование - добавляем пароль
+        const encryptCheckbox = document.getElementById('encrypt-checkbox');
+        const passInput = document.getElementById('file-password');
+        if (encryptCheckbox.checked && passInput.value.trim()) {
+            formData.append('file_password', passInput.value.trim());
+        }
+
+        formData.append('file', audioFile);
+
+        try {
+            document.getElementById('upload-status').style.display = 'flex';
+            document.getElementById('upload-text').innerText = 'Отправка голоса...';
+            
+            const res = await fetch('/send_message', { 
+                method: 'POST', 
+                body: formData 
+            });
+            
+            if (!res.ok) {
+                throw new Error(`Ошибка сервера: ${res.status}`);
+            }
+            
+            // Очищаем поле ввода и сбрасываем ответ
+            document.getElementById('msg-input').value = '';
+            cancelReply();
+            
+            // Не вызываем loadMessages() - Socket.IO обновит чат автоматически
+            
+        } catch (e) {
+            console.error('Ошибка отправки голосового:', e);
+            alert('Не удалось отправить голосовое сообщение');
+        } finally {
+            document.getElementById('upload-status').style.display = 'none';
+        }
+    }
+
+    function resetRecUI() {
+        clearInterval(recInterval);
+        document.getElementById('rec-timer').innerText = '00:00';
+        document.getElementById('text-input-ui').style.display = 'flex';
+        document.getElementById('recording-ui').style.display = 'none';
+        audioChunks = [];
+    }
+    
+    // --- Логика Фонов ---
+    function toggleBgPicker() {
+        const menu = document.getElementById('bg-picker-menu');
+        menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+    }
+    
+    function changeBackground(bgClass) {
+        if (!currentChatId && !currentGroupId) return;
+        
+        // Отправляем на сервер
+        socket.emit('change_background', {
+            recipient_id: currentChatId,
+            group_id: currentGroupId,
+            background: bgClass
+        });
+        
+        // Применяем локально сразу
+        applyBackgroundClass(bgClass);
+        toggleBgPicker();
+    }
+    
+    socket.on('update_background', (data) => {
+        // Проверяем, для текущего ли это чата
+        let isCurrent = false;
+        if (currentGroupId) {
+            if (data.key === `g_${currentGroupId}`) isCurrent = true;
+        } else if (currentChatId) {
+            // Для ЛС ключ сложнее проверить, просто применим если пришло событие
+            // Сервер шлет только нужным людям
+            isCurrent = true; 
+        }
+        
+        if (isCurrent) {
+            applyBackgroundClass(data.background);
+        }
+    });
+
+    // --- Улучшенная обработка новых сообщений через Socket.IO ---
+    socket.on('new_message', (msg) => {
+        // Воспроизводим звук, если сообщение не от меня
+        if (msg.sender_id !== myUserId) {
+            playNotification();
+        }
+
+        // Обновляем список чатов
+        updateChatList(msg);
+
+        // Если это текущий открытый чат - добавляем сообщение без перезагрузки
+        const isCurrentGroup = currentGroupId && parseInt(currentGroupId) === msg.group_id;
+        const isCurrentDM = currentChatId && (currentChatId === msg.sender_id || currentChatId === msg.recipient_id);
+
+        if (isCurrentGroup || isCurrentDM) {
+            appendMessage(msg);
+        }
+    });
+
+    // --- Статус Онлайн ---
+    
+    // 1. Получение списка онлайн при входе
+    socket.on('online_list', (userIds) => {
+        userIds.forEach(id => updateOnlineStatus(id, 'online'));
+    });
+
+    // 2. Обновление статуса конкретного пользователя
+    socket.on('user_status', (data) => {
+        updateOnlineStatus(data.userId, data.status);
+    });
+
+    function updateOnlineStatus(userId, status) {
+        const badge = document.getElementById(`status-${userId}`);
+        if (badge) {
+            if (status === 'online') badge.classList.add('online');
+            else badge.classList.remove('online');
+        }
+    }
+
+    // Обработка "Кто-то печатает"
+    socket.on('typing', (data) => {
+        // Проверяем, относится ли событие к текущему открытому чату
+        const isCurrentGroup = currentGroupId && parseInt(currentGroupId) === data.group_id;
+        const isCurrentDM = currentChatId && data.sender_id === currentChatId; // В ЛС sender_id должен совпадать с тем, с кем говорим
+
+        if (isCurrentGroup || isCurrentDM) {
+            typingUsers.add(data.username);
+            updateTypingUI();
+        }
+    });
+
+    socket.on('stop_typing', (data) => {
+        const isCurrentGroup = currentGroupId && parseInt(currentGroupId) === data.group_id;
+        const isCurrentDM = currentChatId && data.sender_id === currentChatId;
+
+        if (isCurrentGroup || isCurrentDM) {
+            // Нам нужно знать имя, чтобы удалить, но stop_typing отправляет ID.
+            // В простой реализации очистим UI или будем удалять по логике перерисовки.
+            // Для надежности просто перезапросим UI или очистим список, если это ЛС.
+            // Но так как у нас Set имен, нам нужно имя. 
+            // Упрощение: в ЛС всегда "печатает...", в группе - список.
+            // Но сервер в stop_typing не шлет username. Исправим это на клиенте хитростью:
+            // Просто удаляем всех через таймер или, если пришло stop_typing, скрываем все (для ЛС)
+            // Для групп: лучше просто сбрасывать статус через время, но для ЛС сработает так:
+            
+            // Поскольку мы не получаем username в stop_typing, мы просто скроем индикатор, 
+            // предполагая, что в ЛС собеседник один. В группах это может быть неточно, 
+            // но для MVP достаточно просто очищать Set раз в 3-4 секунды или при stop_typing очищать всё.
+            // Сделаем просто:
+            typingUsers.clear(); 
+            updateTypingUI();
+        }
+    });
+
+    function updateTypingUI() {
+        const el = document.getElementById('typing-indicator');
+        if (typingUsers.size > 0) {
+            const users = Array.from(typingUsers);
+            if (currentGroupId) {
+                // Для группы показываем имена
+                const text = users.join(', ') + (users.length === 1 ? ' печатает...' : ' печатают...');
+                el.innerText = text;
+            } else {
+                // Для ЛС просто текст
+                el.innerText = 'печатает...';
+            }
+            el.classList.add('active');
+        } else {
+            el.classList.remove('active');
+        }
+    }
+
+    // Обработка удаления сообщения в реальном времени
+    socket.on('delete_message', (data) => {
+        const el = document.getElementById(`msg-${data.id}`);
+        if (el) el.remove();
+    });
+
+    // Функция для добавления одного сообщения в чат
+    function appendMessage(msg) {
+        // Проверяем, есть ли уже такое сообщение
+        if (document.getElementById(`msg-${msg.id}`)) return;
+        
+        // Определяем, моё ли сообщение
+        msg.is_mine = (msg.sender_id === myUserId);
+        
+        // Создаём HTML для сообщения
+        const messageHtml = createMessageHtml(msg);
+        
+        // Добавляем в конец чата
+        chatBox.insertAdjacentHTML('beforeend', messageHtml);
+        
+        // Прокручиваем вниз, если пользователь был внизу
+        const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 100;
+        if (isAtBottom) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    // Функция для создания HTML одного сообщения
+    function createMessageHtml(m) {
+        let deleteBtn = '';
+        if (m.is_mine || isAdmin) {
+            deleteBtn = `<button class="delete-msg-btn" onclick="deleteMessage('${m.id}')" title="Удалить">×</button>`;
+        }
+
+        let quoteHtml = '';
+        if (m.reply_to) {
+            let quoteText = m.reply_to.content;
+            if (!quoteText && m.reply_to.filename) quoteText = '📎 Файл';
+            if (!quoteText) quoteText = 'Сообщение удалено';
+            
+            quoteHtml = `
+                <a href="#msg-${m.reply_to.id}" class="msg-quote" onclick="highlightMessage('${m.reply_to.id}')">
+                    <div class="msg-quote-user">${m.reply_to.user}</div>
+                    <div class="msg-quote-text">${quoteText}</div>
+                </a>`;
+        }
+
+        let attachment = '';
+        if (m.filename) {
+            if (m.is_encrypted) {
+                attachment = `
+                    <div style="background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px; margin: 5px 0; display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="downloadSecure('${m.filename}')">
+                        <div style="font-size: 1.5em;">🔒</div>
+                        <div>
+                            <div style="font-weight: bold; color: var(--text-main);">Зашифрованный файл</div>
+                            <div style="font-size: 0.8em; color: var(--text-sec);">Нажмите, чтобы открыть</div>
+                        </div>
+                    </div>
+                `;
+            } else if (/\.(jpg|jpeg|png|gif|webp)$/i.test(m.filename)) {
+                attachment = `
+                    <div class="img-container">
+                        <img src="/uploads/${m.filename}" style="max-width: 100%; border-radius: 5px; display: block; margin: 5px 0;">
+                        <a href="/uploads/${m.filename}" download="${m.filename}" title="Скачать" class="download-btn">↓</a>
+                    </div>
+                `;
+            } else if (/\.(webm|ogg|mp3|wav)$/i.test(m.filename)) {
+                // Важно: добавляем уникальный ID для аудио, чтобы избежать конфликтов
+            } else if (/\.(mp4|webm|ogg|mov|mkv|avi)$/i.test(m.filename) && !m.filename.includes('-voice-')) {
+                // Видео (исключаем голосовые, которые обычно webm с пометкой voice)
+                attachment = `
+                    <div class="img-container">
+                        <video controls src="/uploads/${m.filename}" style="max-width: 100%; border-radius: 5px; display: block; margin: 5px 0; max-height: 400px;"></video>
+                        <a href="/uploads/${m.filename}" download="${m.filename}" title="Скачать" class="download-btn" style="bottom: 40px;">↓</a>
+                    </div>
+                `;
+            } else if (/\.(mp3|wav)$/i.test(m.filename) || (/\.webm$/i.test(m.filename) && m.filename.includes('-voice-'))) {
+                // Аудио и Голосовые (mp3, wav или webm если это голосовое)
+                const audioId = `audio-${m.id}-${Date.now()}`;
+                attachment = `<audio id="${audioId}" controls src="/uploads/${m.filename}" style="width: 100%; margin-top: 5px; min-width: 200px;"></audio>`;
+                attachment = `
+                    <div style="display: flex; align-items: center; gap: 5px; min-width: 200px;">
+                        <audio id="${audioId}" controls src="/uploads/${m.filename}" style="flex: 1; margin-top: 5px;"></audio>
+                        <a href="/uploads/${m.filename}" download="${m.filename}" title="Скачать" style="font-size: 1.2em; text-decoration: none; color: var(--text-sec); margin-top: 5px;">↓</a>
+                    </div>`;
+            } else {
+                attachment = `<a href="/uploads/${m.filename}" target="_blank" style="display: flex; align-items: center; gap: 5px; margin: 5px 0; color: #0088cc; text-decoration: none; background: rgba(255,255,255,0.5); padding: 5px; border-radius: 5px;">📄 Скачать файл</a>`;
+            }
+        }
+
+        let contentHtml = m.content || '';
+        if (contentHtml && (contentHtml.includes('giphy.com/media') || contentHtml.match(/^https?.*\.gif$/i))) {
+            contentHtml = `
+                <div class="img-container">
+                    <img src="${m.content}" style="max-width: 100%; border-radius: 5px; display: block; margin-top: 5px;">
+                    <a href="${m.content}" download="giphy.gif" title="Скачать" class="download-btn">↓</a>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="message-row ${m.is_mine ? 'mine' : ''}" id="msg-${m.id}">
+                <div class="message-bubble">
+                    <div class="sender-name">${m.user}</div>
+                    ${quoteHtml}
+                    ${attachment}
+                    ${contentHtml}
+                    <div class="msg-footer">
+                        <div style="display:flex; align-items:center;">${m.time} <span class="reply-btn-icon" onclick="startReply('${m.id}')" title="Ответить" style="margin-left: 8px;">↩</span></div>
+                        ${deleteBtn}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Функция для обновления списка чатов
+    function updateChatList(msg) {
+        let targetElemId = null;
+        if (msg.group_id) {
+            targetElemId = 'btn-group-' + msg.group_id;
+        } else {
+            if (msg.sender_id === myUserId) {
+                targetElemId = 'btn-user-' + msg.recipient_id;
+            } else {
+                targetElemId = 'btn-user-' + msg.sender_id;
+            }
+        }
+
+        const chatItem = document.getElementById(targetElemId);
+        if (chatItem) {
+            const list = document.querySelector('.chat-list');
+            list.insertBefore(chatItem, list.firstChild);
+
+            const preview = chatItem.querySelector('.chat-last-msg');
+            if (preview) {
+                let text = msg.content;
+                if (!text && msg.filename) {
+                    if (/\.(webm|ogg|mp3|wav)$/i.test(msg.filename)) {
+                        text = '🎤 Голосовое сообщение';
+                    } else {
+                        text = '📎 Файл';
+                    }
+                }
+                preview.innerText = text || 'Новое сообщение';
+                preview.style.color = '#3390ec';
+                
+                // Возвращаем обычный цвет через 3 секунды
+                setTimeout(() => {
+                    preview.style.color = '';
+                }, 3000);
+            }
+        }
+    }
+
+    // Удаляем старый setInterval и заменяем на более умный подход
+    // Вместо setInterval(loadMessages, 3000) используем:
+
+    // Загружаем сообщения только при смене чата или при reconnect
+    let lastLoadTime = Date.now();
+
+    // Проверяем целостность чата раз в 10 секунд (на случай, если Socket.IO отвалился)
+    setInterval(() => {
+        if (currentChatId || currentGroupId) {
+            // Проверяем, есть ли у нас последнее сообщение
+            const lastMsgElement = chatBox.querySelector('.message-row:last-child');
+            if (!lastMsgElement && Date.now() - lastLoadTime > 10000) {
+                // Если чат пуст и прошло больше 10 секунд - перезагружаем
+                loadMessages();
+            }
+        }
+    }, 10000);
+
+    // --- Регистрация Service Worker (PWA) ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => {
+                    console.log('SW зарегистрирован:', reg.scope);
+                })
+                .catch(err => {
+                    console.log('Ошибка SW:', err);
+                });
+        });
+    }
+
+    // --- PUSH УВЕДОЛЕНИЯ ---
+    
+    // Конвертация VAPID ключа
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    async function enablePush() {
+        if (!('serviceWorker' in navigator) || !publicVapidKey || publicVapidKey.includes('ВСТАВЬ')) {
+            alert('Push-уведомления не поддерживаются или не настроены на сервере.');
+            return;
+        }
+
+        // Запрашиваем разрешение
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            alert('Вы запретили уведомления. Разрешите их в настройках браузера.');
+            return;
+        }
+
+        // Регистрируем
+        const register = await navigator.serviceWorker.ready;
+        
+        try {
+            const subscription = await register.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+            });
+
+            // Отправляем на сервер
+            await fetch('/subscribe', {
+                method: 'POST',
+                body: JSON.stringify(subscription),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            document.getElementById('push-btn').style.filter = 'none'; // Делаем кнопку цветной
+            alert('Уведомления включены!');
+        } catch (e) {
+            console.error('Ошибка подписки:', e);
+            alert('Ошибка при включении уведомлений.');
+        }
+    }
+    </script>
+</body>
+</html>

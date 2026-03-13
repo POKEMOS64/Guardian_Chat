@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="text-align: center; margin-top: 50px;">
+    <h2>Вход в Убежище</h2>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}<div class="flash">{{ message }}</div>{% endfor %}
+        {% endif %}
+    {% endwith %}
+    <form method="post" style="display: flex; flex-direction: column; gap: 10px; max-width: 300px; margin: 0 auto;">
+        <input type="text" name="username" placeholder="Имя пользователя" required style="padding: 10px;">
+        <input type="password" name="password" placeholder="Пароль" required style="padding: 10px;">
+        <button type="submit" name="action" value="login" style="padding: 10px; background: #0088cc; color: white; border: none; cursor: pointer;">Войти</button>
+        <button type="submit" name="action" value="register" style="padding: 10px; background: #4caf50; color: white; border: none; cursor: pointer;">Регистрация</button>
+    </form>
+</div>
+{% endblock %}

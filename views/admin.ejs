@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление пользователями</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; margin: 0; display: flex; justify-content: center; padding: 20px; }
+        .container { width: 100%; max-width: 900px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; vertical-align: middle; }
+        th { background: #f8f9fa; color: #555; }
+        .groups-cell { display: flex; gap: 15px; flex-wrap: wrap; }
+        .groups-cell label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        button { cursor: pointer; padding: 8px 15px; border: none; border-radius: 4px; font-size: 0.9em; }
+        .save-btn { background: #28a745; color: white; }
+        .save-btn:hover { background: #218838; }
+        .delete-btn { background: #dc3545; color: white; text-decoration: none; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; display: inline-block; }
+        .delete-btn:hover { background: #c82333; }
+        .back-link { margin-bottom: 20px; display: inline-block; text-decoration: none; color: #0088cc; font-weight: bold; }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.8em; color: white; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Вернуться в чат</a>
+        <h2>Управление пользователями</h2>
+
+        <div style="margin-bottom: 30px; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
+            <h4>Названия групп</h4>
+            <form action="/admin/update_group_names" method="POST" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px;">
+                <% Object.keys(groupNames).map(Number).sort((a,b)=>a-b).forEach(function(i) { %>
+                    <div style="display: flex; flex-direction: column;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <label for="group-<%= i %>" style="font-size: 0.9em; color: #555; margin-bottom: 5px;">ID: <%= i %></label>
+                            <a href="/admin/delete_group/<%= i %>" onclick="return confirm('Удалить группу <%= i %>?')" style="color:red; text-decoration:none; font-size:0.8em;" title="Удалить">✕</a>
+                        </div>
+                        <input type="text" name="<%= i %>" id="group-<%= i %>" value="<%= groupNames[i] || '' %>" placeholder="Название группы <%= i %>" style="padding: 8px;">
+                    </div>
+                <% }); %>
+                <button type="submit" class="save-btn" style="align-self: end;">Сохранить названия</button>
+            </form>
+            <form action="/admin/add_group" method="POST" style="margin-top: 15px;">
+                <button type="submit" style="background: #0088cc; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer;">+ Добавить группу</button>
+            </form>
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Пользователь</th>
+                    <th>Группы доступа</th>
+                    <th style="width: 150px;">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% allUsers.forEach(function(u) { %>
+                <tr>
+                    <td>
+                        <strong><%= u.username %></strong>
+                        <% if (u.is_admin) { %> <span style="color:red; font-size:0.8em;">(Admin)</span> <% } %>
+                    </td>
+                    <td>
+                        <form action="/admin/update_groups" method="POST" id="form-<%= u._id %>">
+                            <input type="hidden" name="target_user_id" value="<%= u._id %>">
+                            <% const uGroups = u.group_ids || (u.group_id ? [u.group_id] : []); %>
+                            <div class="groups-cell">
+                                <% Object.keys(groupNames).map(Number).sort((a,b)=>a-b).forEach(function(gid) { 
+                                    // Генерация цвета на основе ID, чтобы не скучно
+                                    const colors = ['#28a745', '#17a2b8', '#fd7e14', '#6f42c1', '#e83e8c', '#20c997', '#6610f2'];
+                                    const color = colors[(gid - 1) % colors.length];
+                                %>
+                                    <label><input type="checkbox" name="groups" value="<%= gid %>" <%= uGroups.includes(gid) ? 'checked' : '' %>> <span style="color:<%= color %>"><%= groupNames[gid] %></span></label>
+                                <% }); %>
+                            </div>
+                        </form>
+                    </td>
+                    <td>
+                        <button type="submit" form="form-<%= u._id %>" class="save-btn">Сохранить</button>
+                        <% if (!u.is_admin) { %>
+                            <a href="/admin/reject/<%= u._id %>" class="delete-btn" onclick="return confirm('Удалить пользователя <%= u.username %>?')">Удалить</a>
+                        <% } %>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
